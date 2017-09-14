@@ -84,7 +84,7 @@ for f = 1:length(subjfiles)
     for i=1:length(freq.mdlvars.choices)
         for s=1:length(samps)
             samp_full = [samp_full;s];
-            if s~=12; priors_full = [priors_full;s];end
+            if s~=1; priors_full = [priors_full;s];end
         end
     end
 end
@@ -103,13 +103,13 @@ samp_r = zeros(length(samp_full),length(samps)-1);
 for s = 1:length(samps)-1
     samp_r(samp_full==samps(s+1),s) = ones(length(find(samp_full==samps(s+1))),1);
 end
-% categorical variable for stacked samples analysis (prior analysis)
+% categorical variable for stacked samples analysis (prior and surprise analysis)
 samps = unique(priors_full);
 priors_r = zeros(length(priors_full),length(samps)-1);
 for s = 1:length(samps)-1
     priors_r(priors_full==samps(s+1),s) = ones(length(find(priors_full==samps(s+1))),1);
 end
-
+size(priors_r)
 % ==================================================================
 % COMPUTE TRIAL-AVERAGED RESPONSES
 % ==================================================================
@@ -242,74 +242,106 @@ for s = 1:size(smp_LI,4)  % looping through samples
     end
 end
 
+TprecWllrS_LI=[]; TprecllrS_LI=[]; TprecllrXsurpriseS_LI=[];
+fprintf('Running regressions of sample-wise lateralization index (time*freq) onto precedent timestamp power and LLR*surprise...\n')
+for s = 1:size(smp_LI,4)-1  % looping through samples
+    for f = 1:size(smp_LI,2)  % looping through freqs
+        for t = 1:size(smp_LI,3)  % looping through time-points
+            try
+                m = regstats(smp_LI(:,f,t,s+1),[zsmp_LI(:,f,s+1) nanzscore(LLR_full(:,s+1)) nanzscore(LLR_full(:,s+1)).*nanzscore(surprise_full(:,s+1)) sess_r],'linear',{'tstat'});  % LLR and LLR*surprise
+                TprecWllrS_LI(f,t,s) = m.tstat.t(2);
+                TprecllrS_LI(f,t,s) = m.tstat.t(3);
+                TprecllrXsurpriseS_LI(f,t,s) = m.tstat.t(4);
+            catch ME
+                ME.message
+                TprecWllrS_LI(f,t,s) = nan;
+                TprecllrS_LI(f,t,s) = nan;
+                TprecllrXsurpriseS_LI(f,t,s) = nan;
+            end
+        end
+    end
+end
 % ==================================================================
 % SAVE RESULTS
 % ==================================================================
 save([megpath,subject,'_samplewise_output_LIonly.mat'],'smptimes','freqs','grad','cfg',...
-    'TpriorS_LI','TpriorWllrS_LI','TpriorllrS_LI','TllrXsurpriseS_LI','TposteriorS_LI','TllrS_LI')
-
-
-% ==================================================================
-% RUN SAMPLE-WISE REGRESSIONS
-% ==================================================================
-% Sample-wise regressions, lateralization index, using the power of the
-% precedent sample
-
-TpriorS_LI=[]; TpriorWllrS_LI=[]; TpriorllrS_LI=[]; TllrXsurpriseS_LI=[];
-fprintf('Running regressions of sample-wise lateralization index (time*freq) onto signed prior and LLR*surprise, using the power of the precedent sample ...\n')
-for s = 1:size(zsmp_LI,3)-1  % looping through samples
-    for f = 1:size(zsmp_LI,2)  % looping through freqs
-        try
-            m = regstats(zsmp_LI(:,f,s+1),[LPR_full(:,s) sess_r],'linear',{'tstat'});  % prior
-            TpriorS_LI(f,s) = m.tstat.t(2);
-            m = regstats(zsmp_LI(:,f,s+1),[LPR_full(:,s) nanzscore(LLR_full(:,s+1)) nanzscore(LLR_full(:,s+1)).*nanzscore(surprise_full(:,s+1)) sess_r],'linear',{'tstat'});  % LLR and LLR*surprise
-            TpriorWllrS_LI(f,s) = m.tstat.t(2);
-            TpriorllrS_LI(f,s) = m.tstat.t(3);
-            TllrXsurpriseS_LI(f,s) = m.tstat.t(4);
-        catch ME
-            fprintf('error %s', ME.message);
-            TpriorS_LI(f,s) = nan;
-            TpriorWllrS_LI(f,s) = nan;
-            TpriorllrS_LI(f,s) = nan;
-            TllrXsurpriseS_LI(f,s) = nan;
-        end
-    end
-end
-TposteriorS_LI=[]; TllrS_LI=[];
-fprintf('Running regressions of sample-wise lateralization index (time*freq) onto posterior and LLR using the power of the precedent sample...\n')
-for s = 1:size(zsmp_LI,3)  % looping through samples
-    for f = 1:size(zsmp_LI,2)  % looping through freqs
-        try
-            m = regstats(zsmp_LI(:,f,s),[LPR_full(:,s) sess_r],'linear',{'tstat'});  % posterior
-            TposteriorS_LI(f,s) = m.tstat.t(2);
-            m = regstats(zsmp_LI(:,f,s),[LLR_full(:,s) sess_r],'linear',{'tstat'});  % LLR
-            TllrS_LI(f,s) = m.tstat.t(2);
-        catch ME
-            TposteriorS_LI(f,s) = nan;
-            TllrS_LI(f,s) = nan;
-        end
-    end
-end
-
-% ==================================================================
-% SAVE RESULTS
-% ==================================================================
-save([megpath,subject,'_samplewise_zsamp_output_LIonly.mat'],'smptimes','freqs','grad','cfg',...
-    'TpriorS_LI','TpriorWllrS_LI','TpriorllrS_LI', 'TllrXsurpriseS_LI','TposteriorS_LI', 'TllrS_LI');
+    'TpriorS_LI','TpriorWllrS_LI','TpriorllrS_LI','TllrXsurpriseS_LI','TposteriorS_LI','TllrS_LI',...
+    'TprecWllrS_LI','TprecllrS_LI','TprecllrXsurpriseS_LI')
 
 
 % ==================================================================
 % RUN SAMPLE-WISE REGRESSIONS, 'STACKED' APPROACH
 % ==================================================================
 % Sample-wise regressions, lateralization index
-LPR_fsmp = []; LLR_fsmp = []; smp_LI_fsmp = []; surprise_fsmp = [];
+LPR_fsmp = []; LPR_fprior = []; LLR_fsmp = []; smp_LI_fsmp = []; zsmp_LI_fsmp = []; surprise_fsmp = [];
 
-% stack sample variables
+% stack samples for prior belief and LLR*surprise analysis
+for s = 1:size(smp_LI,4)
+    if s==1; LPR_fprior = [LPR_fprior; LPR_full(:,s)]; end
+    if s~=1
+        smp_LI_fsmp = [smp_LI_fsmp; smp_LI(:,:,:,s)]; 
+        zsmp_LI_fsmp = [zsmp_LI_fsmp; zsmp_LI(:,:,s)]; 
+        LLR_fsmp = [LLR_fsmp; LLR_full(:,s)];
+        surprise_fsmp = [surprise_fsmp; surprise_full(:,s)];    
+    end
+    if s~=12 && s~=1; LPR_fprior = [LPR_fprior; LPR_full(:,s)]; end
+end
+
+% adjust categorical variables for prior and surprise sample analysis
+fsp_sess_r = [];
+for i=1:length(sess_r)
+    for s=1:12
+        if s~=1; fsp_sess_r=[fsp_sess_r;sess_r(i,:)]; end
+    end
+end
+
+
+TpriorS_LI=[]; TpriorWllrS_LI=[]; TpriorllrS_LI=[]; TllrXsurpriseS_LI=[];
+fprintf('Running regressions of sample-wise lateralization index (time*freq) onto signed prior and LLR*surprise, stacked approach...\n')
+for f = 1:size(smp_LI_fsmp,2)  % looping through freqs
+    for t = 1:size(smp_LI_fsmp,3)  % looping through time-points
+        try
+            m = regstats(smp_LI_fsmp(:,f,t),[LPR_fprior fsp_sess_r priors_r],'linear',{'tstat'});  % prior
+            TpriorS_LI(f,t) = m.tstat.t(2);
+            m = regstats(smp_LI_fsmp(:,f,t),[LPR_fprior nanzscore(LLR_fsmp) nanzscore(LLR_fsmp).*nanzscore(surprise_fsmp) fsp_sess_r priors_r],'linear',{'tstat'});  % LLR and LLR*surprise
+            TpriorWllrS_LI(f,t) = m.tstat.t(2);
+            TpriorllrS_LI(f,t) = m.tstat.t(3);
+            TllrXsurpriseS_LI(f,t) = m.tstat.t(4);
+        catch ME
+            TpriorS_LI(f,t) = nan;
+            TpriorWllrS_LI(f,t) = nan;
+            TpriorllrS_LI(f,t) = nan;
+            TllrXsurpriseS_LI(f,t) = nan;
+        end
+    end
+end
+
+% Sample-wise regressions, lateralization index, using the power of the
+% precedent sample, stacked approach
+TprecWllrS_LI=[]; TprecllrS_LI=[]; TprecllrXsurpriseS_LI=[];
+fprintf('Running regressions of sample-wise lateralization index (time*freq) onto precedent timestamp power and LLR*surprise, stacked approach...\n')
+for f = 1:size(smp_LI,2)  % looping through freqs
+    for t = 1:size(smp_LI,3)  % looping through time-points
+        try
+            m = regstats(smp_LI_fsmp(:,f,t),[zsmp_LI_fsmp(:,f) nanzscore(LLR_fsmp) nanzscore(LLR_fsmp).*nanzscore(surprise_fsmp) fsp_sess_r priors_r],'linear',{'tstat'});  % LLR and LLR*surprise
+            TprecWllrS_LI(f,t) = m.tstat.t(2);
+            TprecllrS_LI(f,t) = m.tstat.t(3);
+            TprecllrXsurpriseS_LI(f,t) = m.tstat.t(4);
+        catch ME
+            ME.message
+            TprecWllrS_LI(f,t) = nan;
+            TprecllrS_LI(f,t) = nan;
+            TprecllrXsurpriseS_LI(f,t) = nan;
+        end
+    end
+end
+
+% stack sample variables for posterior belief
+smp_LI_fsmp=[]; LPR_fsmp=[]; LLR_fsmp=[];
 for s = 1:size(smp_LI,4)
     smp_LI_fsmp = [smp_LI_fsmp; smp_LI(:,:,:,s)];
     LPR_fsmp = [LPR_fsmp; LPR_full(:,s)];
     LLR_fsmp = [LLR_fsmp; LLR_full(:,s)];
-    surprise_fsmp = [surprise_fsmp; surprise_full(:,s)];
 end
 % adjust categorical variable session
 fs_sess_r = [];
@@ -318,56 +350,6 @@ for i=1:length(sess_r)
         fs_sess_r=[fs_sess_r;sess_r(i,:)];
     end
 end
-% stack samples for prior sample analysis
-LPR_fprior = []; LLR_fprior = []; smp_LI_fprior = []; surprise_fprior = [];
-for s = 1:size(smp_LI,4)
-    if s~=1; smp_LI_fprior = [smp_LI_fprior; smp_LI(:,:,:,s)]; end
-    if s~=12
-        LPR_fprior = [LPR_fprior; LPR_full(:,s)];
-        LLR_fprior = [LLR_fprior; LLR_full(:,s)];
-        surprise_fprior = [surprise_fprior; surprise_full(:,s)];
-    end
-end
-% adjust categorical variables for prior sample analysis
-fsp_sess_r = [];
-for i=1:length(sess_r)
-    for s=1:12
-        if s~=1; fsp_sess_r=[fsp_sess_r;sess_r(i,:)]; end
-    end
-end
-%priors_r
-% size(smp_LI_fprior)
-% size(LPR_fprior)
-% size(LLR_fprior)
-% size(surprise_fprior)
-% size(fsp_sess_r)
-% size(priors_r)
-
-TpriorS_LI=[]; TpriorWllrS_LI=[]; TpriorllrS_LI=[]; TllrXsurpriseS_LI=[];
-fprintf('Running regressions of sample-wise lateralization index (time*freq) onto signed prior and LLR*surprise, stacked approach...\n')
-for f = 1:size(smp_LI_fprior,2)  % looping through freqs
-    for t = 1:size(smp_LI_fprior,3)  % looping through time-points
-        try
-            m = regstats(smp_LI_fprior(:,f,t),[LPR_fprior fsp_sess_r priors_r],'linear',{'tstat'});  % prior
-            TpriorS_LI(f,t) = m.tstat.t(2);
-            m = regstats(smp_LI_fprior(:,f,t),[LPR_fprior nanzscore(LLR_fprior) nanzscore(LLR_fprior).*nanzscore(surprise_fprior) fsp_sess_r priors_r],'linear',{'tstat'});  % LLR and LLR*surprise
-            TpriorWllrS_LI(f,t) = m.tstat.t(2);
-            TpriorllrS_LI(f,t) = m.tstat.t(3);
-            TllrXsurpriseS_LI(f,t) = m.tstat.t(4);
-        catch ME
-            size(smp_LI_fprior(:,f,t))
-            ME.message
-            TpriorS_LI(f,t) = nan;
-            TpriorWllrS_LI(f,t) = nan;
-            TpriorllrS_LI(f,t) = nan;
-            TllrXsurpriseS_LI(f,t) = nan;
-        end
-    end
-end
-% size(smp_LI_fsmp)
-% size(LPR_fsmp)
-% size(fs_sess_r)
-% size(samp_r)
 
 TposteriorS_LI=[]; TllrS_LI=[];
 fprintf('Running regressions of sample-wise lateralization index (time*freq) onto posterior and LLR, stacked approach...\n')
@@ -379,7 +361,6 @@ for f = 1:size(smp_LI_fsmp,2)  % looping through freqs
             m = regstats(smp_LI_fsmp(:,f,t),[LLR_fsmp fs_sess_r samp_r],'linear',{'tstat'});  % LLR
             TllrS_LI(f,t) = m.tstat.t(2);
         catch ME
-            ME.message
             TposteriorS_LI(f,t,s) = nan;
             TllrS_LI(f,t) = nan;
         end
@@ -387,74 +368,8 @@ for f = 1:size(smp_LI_fsmp,2)  % looping through freqs
 end
 
 save([megpath,subject,'_samplewise_stacksam_LIonly.mat'],'smptimes','freqs','grad','cfg',...
-    'TpriorS_LI','TpriorWllrS_LI','TpriorllrS_LI','TllrXsurpriseS_LI','TposteriorS_LI','TllrS_LI')
-
-
-% =========================================================================
-% RUN SAMPLE-WISE REGRESSIONS, POWER PRECENDENT SAMPLE, 'STACKED' APPROACH
-% =========================================================================
-% % % Sample-wise regressions, lateralization index, using the power of the
-% % % precedent sample
-% % 
-% % LPR_fsmp = []; LLR_fsmp = []; zsmp_LI_fsmp = [];
-% % for s = 1:size(smp_LI,3)
-% %     zsmp_LI_fsmp = [zsmp_LI_fsmp; zsmp_LI(:,:,s)];
-% %     LPR_fsmp = [LPR_fsmp; LPR_full(:,s)];
-% %     LLR_fsmp = [LLR_fsmp; LLR_full(:,s)];
-% % end
-% % 
-% % % adjust categorical variable session
-% % nsess_r = [];
-% % for i=1:length(sess_r)
-% %     for j=1:12
-% %         nsess_r(end+1)=sess_r(i);
-% %     end
-% % end
-% % sess_r=nsess_r';
-% % 
-% % % create categorical variable: sample (position dot) variable
-% % samp_r = 1:12:length(nsess_r)';
-% % 
-% % TpriorS_LI=[]; TpriorWllrS_LI=[]; TllrS_LI=[]; TllrXsurpriseS_LI=[];
-% % fprintf('Running regressions of sample-wise lateralization index (time*freq) onto signed prior and LLR*surprise, with stacked samples approach......\n')
-% % for s = 1:size(zsmp_LI,4)-1  % looping through samples
-% %     for f = 1:size(zsmp_LI,2)  % looping through freqs
-% %         try
-% %             m = regstats(zsmp_LI(:,f,s+1),[LPR_full(:,s) sess_r],'linear',{'tstat'});  % prior
-% %             TpriorS_LI(f,s) = m.tstat.t(2);
-% %             m = regstats(zsmp_LI(:,f,s+1),[LPR_full(:,s) nanzscore(LLR_full(:,s+1)) nanzscore(LLR_full(:,s+1)).*nanzscore(surprise_fprior(:,s+1)) sess_r],'linear',{'tstat'});  % LLR and LLR*surprise
-% %             TpriorWllrS_LI(f,s) = m.tstat.t(2);
-% %             TllrS_LI(f,s) = m.tstat.t(3);
-% %             TllrXsurpriseS_LI(f,s) = m.tstat.t(4);
-% %         catch MEsurprise_full
-% %             TpriorS_LI(f,s) = nan;
-% %             TpriorWllrS_LI(f,s) = nan;
-% %             TllrS_LI(f,s) = nan;
-% %             TllrXsurpriseS_LI(f,s) = nan;
-% %         end
-% %     end
-% % endfsp_sess_r
-% % 
-% % TposteriorFS_LI=[]; TllrFS_LI=[];
-% % fprintf('Running regressions of sample-wise lateralization index (time*freq) onto posterior and LLR with stacked samples approach...\n')
-% % for f = 1:size(zsmp_LI_fsmp,2)  % looping through freqs
-% %     try
-% %         m = regstats(zsmp_LI_fsmp(:,f),[LPR_fsmp sess_r samp_r],'linear',{'tstat'});  % posterior
-% %         TposteriorFS_LI(f) = m.tstat.t(2);
-% %         m = regstats(zsmp_LI_fsmp(:,f),[LLR_fsmp sess_r samp_r],'linear',{'tstat'});  % LLR
-% %         TllrFS_LI(f) = m.tstat.t(2);
-% %     catch ME
-% %         TposteriorFS_LI(f,t,s) = nan;
-% %         TllrFS_LI(f) = nan;
-% %     end
-% % end
-% % 
-% % % ==================================================================
-% % % SAVE RESULTS
-% % % ==================================================================
-% % save([megpath,subject,'_samplewise_stacksam_output_LIonly.mat'],'smptimes','freqs','grad','cfg',...
-% %     'TpriorS_LI','TpriorWllrS_LI','TllrS_LI','TllrXsurpriseS_LI','TposteriorS_LI','TllrS_LI', 'TposteriorFS_LI','TllrFS_LI')
-
+    'TpriorS_LI','TpriorWllrS_LI','TpriorllrS_LI','TllrXsurpriseS_LI','TposteriorS_LI','TllrS_LI',...
+    'TprecWllrS_LI', 'TprecllrS_LI', 'TprecllrXsurpriseS_LI')
 end
 
 
